@@ -1,0 +1,27 @@
+# permissions for end users to view configops.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: configop-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: config-operator
+    app.kubernetes.io/part-of: config-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: configop-viewer-role
+rules:
+- apiGroups:
+  - config.configop.com
+  resources:
+  - configops
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - config.configop.com
+  resources:
+  - configops/status
+  verbs:
+  - get

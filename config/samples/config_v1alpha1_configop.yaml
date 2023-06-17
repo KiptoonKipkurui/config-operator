@@ -1,0 +1,33 @@
+apiVersion: config.configop.com/v1alpha1
+kind: ConfigOp
+metadata:
+  labels:
+    app.kubernetes.io/name: configop
+    app.kubernetes.io/instance: configop-sample
+    app.kubernetes.io/part-of: config-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: config-operator
+  name: configop-sample
+spec:
+  # TODO(user): Add fields here
+   # TODO(user): Add fields here
+  configMaps:   
+  - name: example-config
+    configMap:
+      data:
+        # Configuration values can be set as key-value properties
+        database: mongodb
+        database_uri: mongodb://localhost:27017
+        
+        # Or set as complete file contents (even JSON!)
+        keys: | 
+          image.public.key=771 
+          rsa.public.key=42
+  secrets:  
+  - name: example-secret
+    secret: 
+      data:
+        username: YWRtaW4=
+        password: MWYyZDFlMmU2N2Rm
+    
+  namespaces: [default,nexus]
