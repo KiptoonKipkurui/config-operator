@@ -18,8 +18,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -100,23 +102,45 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	// loop through all namespaces ensuring the resources map exits or create otherwise
 	for _, namespace := range crd.Spec.Namespaces {
 
+		// check if namespace exists
+		ns := &v1.Namespace{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns)
+
+		if err != nil {
+			// create namespace since it doesnt exist
+			ns.Name = namespace
+			err = r.Create(ctx, ns)
+			log.Log.Error(err, fmt.Sprintf("unable to create namespace %s", namespace))
+		}
 		// start with config maps
 		for _, v := range crd.Spec.ConfigMaps {
-			var configMap v1.ConfigMap
+			configMap := v1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      v.Name,
+					Namespace: namespace,
+				},
+				Data:       v.Data,
+				BinaryData: v.BinaryData,
+				Immutable:  v.Immutable,
+			}
+
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
 			//create config map
-			v.ConfigMap.Namespace = namespace
-			v.ConfigMap.Name = v.Name
+
 			if err := r.Get(ctx, namespacedName, &configMap); err != nil {
 
 				//create the resource
-				err = r.Create(ctx, &v.ConfigMap)
+				err = r.Create(ctx, &configMap)
 				if err != nil {
-					log.Log.Error(err, "unable to create config map")
+					log.Log.Error(err, fmt.Sprintf("unable to create config map %s", configMap.Name))
 				}
 			} else {
 				// this is an update and so update the existing config map
-				err = r.Update(ctx, &v.ConfigMap)
+				err = r.Update(ctx, &configMap)
 
 				// log any errors
 				if err != nil {
@@ -127,55 +151,76 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 		// replicate secrets
 		for _, v := range crd.Spec.Secrets {
-			var configMap v1.Secret
+			secret := v1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      v.Name,
+					Namespace: namespace,
+				},
+				Data:       v.Data,
+				StringData: v.StringData,
+				Immutable:  v.Immutable,
+				Type:       v.Type,
+			}
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
-			//create config map
-			v.Secret.Namespace = namespace
-			v.Secret.Name = v.Name
-			if err := r.Get(ctx, namespacedName, &configMap); err != nil {
+			//create secret
+			if err := r.Get(ctx, namespacedName, &secret); err != nil {
 
 				// create the secret
-				err = r.Create(ctx, &v.Secret)
+				err = r.Create(ctx, &secret)
 
 				// log any errors
 				if err != nil {
-					log.Log.Error(err, "unable to create config map")
+					log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
 				}
 			} else {
 
 				// update the existing resource
-				err = r.Update(ctx, &v.Secret)
+				err = r.Update(ctx, &secret)
 
 				// log any errors
 				if err != nil {
-					log.Log.Error(err, "unable to create config map")
+					log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
 				}
-
 			}
-
 		}
 	}
 
 	return ctrl.Result{}, nil
 }
 
+// CleanUpResources is a sweeper function that runs just before a crd is deleted
+// to remove any resources created by the CRD
 func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1alpha1.ConfigOp) error {
 	for _, namespace := range crd.Spec.Namespaces {
 
 		// start with config maps
 		for _, v := range crd.Spec.ConfigMaps {
-			var configMap v1.ConfigMap
+			configMap := v1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      v.Name,
+					Namespace: namespace,
+				},
+				Data:       v.Data,
+				BinaryData: v.BinaryData,
+				Immutable:  v.Immutable,
+			}
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
 			//create config map
-			v.ConfigMap.Namespace = namespace
-			v.ConfigMap.Name = v.Name
 
 			if err := r.Get(ctx, namespacedName, &configMap); err == nil {
 
 				//create the resource
-				err = r.Delete(ctx, &v.ConfigMap)
+				err = r.Delete(ctx, &configMap)
 				if err != nil {
-					log.Log.Error(err, "unable to delete config map")
+					log.Log.Error(err, fmt.Sprintf("unable to delete configMap %s", configMap.Name))
 					return err
 				}
 			}
@@ -183,19 +228,31 @@ func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1a
 
 		// replicate secrets
 		for _, v := range crd.Spec.Secrets {
-			var configMap v1.Secret
+			secret := v1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      v.Name,
+					Namespace: namespace,
+				},
+				Data:       v.Data,
+				StringData: v.StringData,
+				Immutable:  v.Immutable,
+				Type:       v.Type,
+			}
 			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
-			//create config map
-			v.Secret.Namespace = namespace
-			v.Secret.Name = v.Name
-			if err := r.Get(ctx, namespacedName, &configMap); err == nil {
+			//delete secret
+
+			if err := r.Get(ctx, namespacedName, &secret); err == nil {
 
 				// create the secret
-				err = r.Delete(ctx, &v.Secret)
+				err = r.Delete(ctx, &secret)
 
 				// log any errors
 				if err != nil {
-					log.Log.Error(err, "unable to delete config map")
+					log.Log.Error(err, fmt.Sprintf("unable to delete secret %s", secret.Name))
 					return err
 				}
 			}
