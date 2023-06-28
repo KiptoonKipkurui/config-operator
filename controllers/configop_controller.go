@@ -66,7 +66,7 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	}
 
 	// name of our custom finalizer
-	myFinalizerName := "batch.tutorial.kubebuilder.io/finalizer"
+	myFinalizerName := "configop.congfig/finalizer"
 	// examine DeletionTimestamp to determine if object is under deletion
 	if crd.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, so if it does not have our finalizer,
@@ -103,93 +103,134 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	for _, namespace := range crd.Spec.Namespaces {
 
 		// check if namespace exists
-		ns := &v1.Namespace{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns)
+		err := r.CreateNSIfNotExist(ctx, namespace)
 
 		if err != nil {
-			// create namespace since it doesnt exist
-			ns.Name = namespace
-			err = r.Create(ctx, ns)
-			log.Log.Error(err, fmt.Sprintf("unable to create namespace %s", namespace))
+			return ctrl.Result{}, err
 		}
 		// start with config maps
 		for _, v := range crd.Spec.ConfigMaps {
-			configMap := v1.ConfigMap{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "ConfigMap",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      v.Name,
-					Namespace: namespace,
-				},
-				Data:       v.Data,
-				BinaryData: v.BinaryData,
-				Immutable:  v.Immutable,
-			}
 
-			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
-			//create config map
-
-			if err := r.Get(ctx, namespacedName, &configMap); err != nil {
-
-				//create the resource
-				err = r.Create(ctx, &configMap)
-				if err != nil {
-					log.Log.Error(err, fmt.Sprintf("unable to create config map %s", configMap.Name))
-				}
-			} else {
-				// this is an update and so update the existing config map
-				err = r.Update(ctx, &configMap)
-
-				// log any errors
-				if err != nil {
-					log.Log.Error(err, "unable to update config map")
-				}
+			err = r.CreateConfigMap(ctx, v, namespace)
+			if err != nil {
+				return ctrl.Result{}, err
 			}
 		}
 
 		// replicate secrets
 		for _, v := range crd.Spec.Secrets {
-			secret := v1.Secret{
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "Secret",
-					APIVersion: "v1",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      v.Name,
-					Namespace: namespace,
-				},
-				Data:       v.Data,
-				StringData: v.StringData,
-				Immutable:  v.Immutable,
-				Type:       v.Type,
-			}
-			namespacedName := types.NamespacedName{Namespace: namespace, Name: v.Name}
-			//create secret
-			if err := r.Get(ctx, namespacedName, &secret); err != nil {
-
-				// create the secret
-				err = r.Create(ctx, &secret)
-
-				// log any errors
-				if err != nil {
-					log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
-				}
-			} else {
-
-				// update the existing resource
-				err = r.Update(ctx, &secret)
-
-				// log any errors
-				if err != nil {
-					log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
-				}
+			err = r.CreateSecret(ctx, v, namespace)
+			if err != nil {
+				return ctrl.Result{}, err
 			}
 		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+// CreateNSIfNotExist checks for existance of a namespace and creates it if it doesnt exist
+func (r *ConfigOpReconciler) CreateNSIfNotExist(ctx context.Context, namespace string) error {
+	// check if namespace exists
+	ns := &v1.Namespace{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns)
+
+	if err != nil {
+		// create namespace since it doesnt exist
+		ns.Name = namespace
+		err = r.Create(ctx, ns)
+		log.Log.Error(err, fmt.Sprintf("unable to create namespace %s", namespace))
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// CreateConfigMap creates a configMap in a namespace from managed config map model
+func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alpha1.ManagedConfigMap, namespace string) error {
+	configMap := v1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: namespace,
+		},
+		Data:       c.Data,
+		BinaryData: c.BinaryData,
+		Immutable:  c.Immutable,
+	}
+
+	namespacedName := types.NamespacedName{Namespace: namespace, Name: c.Name}
+	//create config map
+
+	if err := r.Get(ctx, namespacedName, &configMap); err != nil {
+
+		//create the resource
+		err = r.Create(ctx, &configMap)
+		if err != nil {
+			log.Log.Error(err, fmt.Sprintf("unable to create config map %s", configMap.Name))
+			return err
+		}
+	} else {
+		// this is an update and so update the existing config map
+		err = r.Update(ctx, &configMap)
+
+		// log any errors
+		if err != nil {
+			log.Log.Error(err, "unable to update config map")
+			return err
+		}
+	}
+	return nil
+}
+
+// CreateSecret creates a secret in a namespace from a managed secret model
+func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.ManagedSecret, namespace string) error {
+	// build secret object
+	secret := v1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Secret",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.Name,
+			Namespace: namespace,
+		},
+		Data:       s.Data,
+		StringData: s.StringData,
+		Immutable:  s.Immutable,
+		Type:       s.Type,
+	}
+	namespacedName := types.NamespacedName{Namespace: namespace, Name: s.Name}
+	//create secret
+	if err := r.Get(ctx, namespacedName, &secret); err != nil {
+
+		// create the secret
+		err = r.Create(ctx, &secret)
+
+		// log any errors
+		if err != nil {
+			log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
+			return err
+		}
+	} else {
+
+		// update the existing resource
+		err = r.Update(ctx, &secret)
+
+		// log any errors
+		if err != nil {
+			log.Log.Error(err, fmt.Sprintf("unable to create secret %s", secret.Name))
+			return err
+		}
+	}
+
+	return nil
 }
 
 // CleanUpResources is a sweeper function that runs just before a crd is deleted
