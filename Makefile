@@ -103,7 +103,7 @@ vet: ## Run go vet against code.
 
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -i --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
 
 ##@ Build
 
@@ -258,3 +258,15 @@ catalog-build: opm ## Build a catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+
+
+
+webhook-certs: ## generate self-signed cert and key for local webhook development
+	mkdir -p /tmp/k8s-webhook-server/serving-certs
+	openssl req -x509 \
+				-newkey rsa:2048 \
+				-nodes \
+				-keyout /tmp/k8s-webhook-server/serving-certs/tls.key \
+				-out /tmp/k8s-webhook-server/serving-certs/tls.crt \
+				-days 365 \
+				-subj '/CN=local-webhook'
