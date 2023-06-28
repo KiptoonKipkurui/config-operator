@@ -1,0 +1,59 @@
+
+
+{
+    "apiVersion": "admission.k8s.io/v1",
+    "kind": "AdmissionReview",
+      "object": {
+        "apiVersion": "config.configop.com/v1alpha1",
+        "kind": "ConfigOp",
+        "metadata": {
+            "annotations": {
+                "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"config.configop.com/v1alpha1\",\"kind\":\"ConfigOp\",\"metadata\":{\"annotations\":{},\"labels\":{\"app.kubernetes.io/created-by\":\"config-operator\",\"app.kubernetes.io/instance\":\"configop-sample\",\"app.kubernetes.io/managed-by\":\"kustomize\",\"app.kubernetes.io/name\":\"configop\",\"app.kubernetes.io/part-of\":\"config-operator\"},\"name\":\"configop-sample-5\",\"namespace\":\"default\"},\"spec\":{\"configMaps\":[{\"data\":{\"database\":\"mongodb\",\"database_uri\":\"mongodb://localhost:27017\",\"keys\":\"image.public.key=771 \\nrsa.public.key=42\\n\"},\"name\":\"example-config\"}],\"namespaces\":[\"default\",\"nexus\"],\"secrets\":[{\"data\":{\"password\":\"MWYyZDFlMmU2N2Rm\",\"username\":\"YWRtaW4=\"},\"name\":\"example-secret\"}]}}\n"
+            },
+            "creationTimestamp": "2023-06-27T05:53:57Z",
+            "finalizers": [
+                "configop.congfig/finalizer"
+            ],
+            "generation": 1,
+            "labels": {
+                "addonmanager.kubernetes.io/mode": "Reconcile",
+                "app.kubernetes.io/component": "configuration",
+                "app.kubernetes.io/instance": "configOp-instance",
+                "app.kubernetes.io/managed-by": "configop-operator",
+                "app.kubernetes.io/name": "configOp",
+                "app.kubernetes.io/part-of": "configop-operator",
+                "app.kubernetes.io/version": "v1alpha1"
+            },
+            "name": "configop-sample-5fwagewgerwgewgrehtrjhtrjtrjrtjet2dwqswqdewqhyyukrjytw4rewdds2sfsasdgeqwhrewhtrtrurjtyyujujuk",
+            "namespace": "default",
+            "resourceVersion": "1886",
+            "uid": "3e4581c3-68bb-4c64-8a9f-ca15c21100bf"
+        },
+        "spec": {
+            "configMaps": [
+                {
+                    "data": {
+                        "database": "mongodb",
+                        "database_uri": "mongodb://localhost:27017",
+                        "keys": "image.public.key=771 \nrsa.public.key=42\n"
+                    },
+                    "name": "example-config"
+                }
+            ],
+            "namespaces": [
+                "default",
+                "nexus"
+            ],
+            "secrets": [
+                {
+                    "data": {
+                        "password": "MWYyZDFlMmU2N2Rm",
+                        "username": "YWRtaW4="
+                    },
+                    "name": "example-secret"
+                }
+            ]
+        }    
+      }
+  }
+  
