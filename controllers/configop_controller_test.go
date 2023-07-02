@@ -6,6 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"golang.org/x/exp/slices"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -27,7 +28,6 @@ var _ = Describe("ConfigOp controller", func() {
 	const (
 		ConfigOpName      = "test-configop"
 		ConfigOpNamespace = "default"
-		JobName           = "test-job"
 
 		timeout  = time.Second * 10
 		duration = time.Second * 10
@@ -141,6 +141,12 @@ var _ = Describe("ConfigOp controller", func() {
 			Expect(k8sClient.Get(context.Background(), configOpLookupKey, updated)).Should(Succeed())
 
 			updated.Spec.Namespaces = append(updated.Spec.Namespaces, "config-ns")
+			idx := slices.IndexFunc(updated.Spec.ConfigMaps, func(c configv1alpha1.ManagedConfigMap) bool { return c.Name == "test-configmap" })
+			data := map[string]string{
+				"sql": "test;connectionstring",
+			}
+			updated.Spec.ConfigMaps[idx].Data = data
+
 			Expect(k8sClient.Update(context.Background(), updated)).Should(Succeed())
 
 			// ensure new namespace has been created
@@ -150,12 +156,12 @@ var _ = Describe("ConfigOp controller", func() {
 			})
 			// ensure that the config map has been created
 			configmapKey = types.NamespacedName{Name: "test-configmap", Namespace: "config-ns"}
-
+			updatedConfigMap := &v1.ConfigMap{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, configmapKey, createdConfigMap)
+				err := k8sClient.Get(ctx, configmapKey, updatedConfigMap)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
-
+			Expect(updatedConfigMap.Data).To(Equal(data))
 		})
 	})
 })
