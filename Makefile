@@ -260,7 +260,7 @@ catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 
-
+# create webhook certs for local testing
 webhook-certs: ## generate self-signed cert and key for local webhook development
 	mkdir -p /tmp/k8s-webhook-server/serving-certs
 	openssl req -x509 \
@@ -270,3 +270,14 @@ webhook-certs: ## generate self-signed cert and key for local webhook developmen
 				-out /tmp/k8s-webhook-server/serving-certs/tls.crt \
 				-days 365 \
 				-subj '/CN=local-webhook'
+
+# generate helm file
+HELMIFY ?= $(LOCALBIN)/helmify
+
+.PHONY: helmify
+helmify: $(HELMIFY) ## Download helmify locally if necessary.
+$(HELMIFY): $(LOCALBIN)
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+    
+helm: manifests kustomize helmify
+	$(KUSTOMIZE) build config/default | $(HELMIFY)
