@@ -39,6 +39,9 @@ type ConfigOpReconciler struct {
 }
 
 //+kubebuilder:rbac:groups=config.configop.com,resources=configops,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=config.configop.com,resources=configops/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=config.configop.com,resources=configops/finalizers,verbs=update
 
@@ -52,11 +55,11 @@ type ConfigOpReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
 
 	_ = log.FromContext(ctx)
 	var crd configv1alpha1.ConfigOp
 
+	log.Log.Info("Begin reconcile function")
 	if err := r.Get(ctx, req.NamespacedName, &crd); err != nil {
 		log.Log.Error(err, "unable to fetch Custom resource")
 		// we'll ignore not-found errors, since they can't be fixed by an immediate
@@ -72,6 +75,8 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// The object is not being deleted, so if it does not have our finalizer,
 		// then lets add the finalizer and update the object. This is equivalent
 		// registering our finalizer.
+		log.Log.Info("Adding finalizer")
+
 		if !controllerutil.ContainsFinalizer(&crd, myFinalizerName) {
 			controllerutil.AddFinalizer(&crd, myFinalizerName)
 			if err := r.Update(ctx, &crd); err != nil {
@@ -81,6 +86,7 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	} else {
 		// The object is being deleted
 		if controllerutil.ContainsFinalizer(&crd, myFinalizerName) {
+			log.Log.Info(fmt.Sprintf("%s crd being deleted...cleaning up resources", crd.Name))
 			// our finalizer is present, so lets handle any external dependency
 			if err := r.CleanUpResources(ctx, crd); err != nil {
 				// if fail to delete the external dependency here, return with error
@@ -111,7 +117,7 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		// start with config maps
 		for _, v := range crd.Spec.ConfigMaps {
 
-			err = r.CreateConfigMap(ctx, v, namespace)
+			err = r.CreateConfigMap(ctx, v, namespace, crd)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -119,7 +125,7 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 
 		// replicate secrets
 		for _, v := range crd.Spec.Secrets {
-			err = r.CreateSecret(ctx, v, namespace)
+			err = r.CreateSecret(ctx, v, namespace, crd)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -133,9 +139,12 @@ func (r *ConfigOpReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 func (r *ConfigOpReconciler) CreateNSIfNotExist(ctx context.Context, namespace string) error {
 	// check if namespace exists
 	ns := &v1.Namespace{}
+	log.Log.Info("Checking whether namespace exists")
 	err := r.Client.Get(ctx, types.NamespacedName{Name: namespace}, ns)
 
 	if err != nil {
+
+		log.Log.Info(fmt.Sprintf("Creating namespace %s", namespace))
 		// create namespace since it doesnt exist
 		ns.Name = namespace
 		err = r.Create(ctx, ns)
@@ -150,7 +159,7 @@ func (r *ConfigOpReconciler) CreateNSIfNotExist(ctx context.Context, namespace s
 }
 
 // CreateConfigMap creates a configMap in a namespace from managed config map model
-func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alpha1.ManagedConfigMap, namespace string) error {
+func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alpha1.ManagedConfigMap, namespace string, crd configv1alpha1.ConfigOp) error {
 	configMap := v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ConfigMap",
@@ -170,6 +179,8 @@ func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alph
 
 	if err := r.Get(ctx, namespacedName, &configMap); err != nil {
 
+		log.Log.Info(fmt.Sprintf("Creating secret %s", configMap.Name))
+
 		//create the resource
 		err = r.Create(ctx, &configMap)
 		if err != nil {
@@ -177,6 +188,8 @@ func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alph
 			return err
 		}
 	} else {
+		log.Log.Info(fmt.Sprintf("Updating ConfigMap %s", configMap.Name))
+
 		// this is an update and so update the existing config map
 		err = r.Update(ctx, &configMap)
 
@@ -190,7 +203,7 @@ func (r *ConfigOpReconciler) CreateConfigMap(ctx context.Context, c configv1alph
 }
 
 // CreateSecret creates a secret in a namespace from a managed secret model
-func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.ManagedSecret, namespace string) error {
+func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.ManagedSecret, namespace string, crd configv1alpha1.ConfigOp) error {
 	// build secret object
 	secret := v1.Secret{
 		TypeMeta: metav1.TypeMeta{
@@ -210,6 +223,8 @@ func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.
 	//create secret
 	if err := r.Get(ctx, namespacedName, &secret); err != nil {
 
+		log.Log.Info(fmt.Sprintf("Creating secret %s", secret.Name))
+
 		// create the secret
 		err = r.Create(ctx, &secret)
 
@@ -219,6 +234,8 @@ func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.
 			return err
 		}
 	} else {
+
+		log.Log.Info(fmt.Sprintf("Updating secret %s", secret.Name))
 
 		// update the existing resource
 		err = r.Update(ctx, &secret)
@@ -236,6 +253,8 @@ func (r *ConfigOpReconciler) CreateSecret(ctx context.Context, s configv1alpha1.
 // CleanUpResources is a sweeper function that runs just before a crd is deleted
 // to remove any resources created by the CRD
 func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1alpha1.ConfigOp) error {
+
+	log.Log.Info("Begin clean up of resources.")
 	for _, namespace := range crd.Spec.Namespaces {
 
 		// start with config maps
@@ -257,6 +276,8 @@ func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1a
 			//create config map
 
 			if err := r.Get(ctx, namespacedName, &configMap); err == nil {
+
+				log.Log.Info(fmt.Sprintf("Deleting configmap %s in namespace %s", configMap.Name, namespace))
 
 				//create the resource
 				err = r.Delete(ctx, &configMap)
@@ -288,6 +309,8 @@ func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1a
 
 			if err := r.Get(ctx, namespacedName, &secret); err == nil {
 
+				log.Log.Info(fmt.Sprintf("Deleting configmap %s in namespace %s", secret.Name, namespace))
+
 				// create the secret
 				err = r.Delete(ctx, &secret)
 
@@ -307,5 +330,7 @@ func (r *ConfigOpReconciler) CleanUpResources(ctx context.Context, crd configv1a
 func (r *ConfigOpReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&configv1alpha1.ConfigOp{}).
+		Owns(&v1.ConfigMap{}).
+		Owns(&v1.Secret{}).
 		Complete(r)
 }
