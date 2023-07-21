@@ -1,8 +1,9 @@
 # config-operator
-// TODO(user): Add simple overview of use/purpose
+A tool to manage ConfigMaps and Secrets in namespaces. One Custom Resource to manage multiple ConfigMaps and Secrets
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+ConfigOp is a Kubernetes Operator that uses a Custom Resource to manage Kubernetes Configuration in multiple namespaces.
+The project aims to simplify Copying configuration between different namespaces. 
 
 ## Getting Started
 You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
