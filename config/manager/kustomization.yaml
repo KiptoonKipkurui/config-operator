@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: danchi101/configop
-  newTag: "002"
+  newTag: "003"
