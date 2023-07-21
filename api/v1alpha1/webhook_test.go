@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	// configv1alpha1 "github.com/kiptoonkipkurui/config-operator/api/v1alpha1"
 )
 
 var _ = Describe("Webhook test", func() {
@@ -17,7 +16,6 @@ var _ = Describe("Webhook test", func() {
 	const (
 		ConfigOpName      = "test-configop"
 		ConfigOpNamespace = "default"
-		JobName           = "test-job"
 
 		timeout  = time.Second * 10
 		duration = time.Second * 10
@@ -89,63 +87,16 @@ var _ = Describe("Webhook test", func() {
 				err := k8sClient.Get(ctx, configOpLookupKey, createdConfigOp)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
-			// // Let's make sure our the namespaces in our spec have been created.
-			// Expect(createdConfigOp.Spec.Namespaces).Should(Equal([]string{"default", "test"}))
-			// Expect(len(createdConfigOp.Spec.ConfigMaps)).Should(Equal(1))
-			// Expect(len(createdConfigOp.Spec.Secrets)).Should(Equal(1))
+			data := make(map[string]string)
+			data["app.kubernetes.io/name"] = "configOp"
+			data["app.kubernetes.io/instance"] = "configOp-instance"
+			data["app.kubernetes.io/version"] = "v1alpha1"
+			data["app.kubernetes.io/component"] = "configuration"
+			data["app.kubernetes.io/part-of"] = "configop-operator"
+			data["app.kubernetes.io/managed-by"] = "configop-operator"
+			data["addonmanager.kubernetes.io/mode"] = "Reconcile"
 
-			// // ensure that the config map has been created
-			// configmapKey := types.NamespacedName{Name: "test-configmap", Namespace: "test"}
-			// createdConfigMap := &v1.ConfigMap{}
-
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, configmapKey, createdConfigMap)
-			// 	return err == nil
-			// }, timeout, interval).Should(BeTrue())
-
-			// Expect(createdConfigMap).ToNot(BeNil())
-
-			// // ensure that the secret example-secret has been created
-			// secretKey := types.NamespacedName{Name: "example-secret", Namespace: "test"}
-			// createdSecret := &v1.Secret{}
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, secretKey, createdSecret)
-			// 	return err == nil
-			// }, timeout, interval).Should(BeTrue())
-
-			// Expect(createdSecret).ToNot(BeNil())
-
-			// // ensure that the test namespace has been created
-			// ns := &v1.Namespace{}
-
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, types.NamespacedName{Name: "test"}, ns)
-			// 	return err == nil
-			// })
-
-			// Expect(ns).ToNot(BeNil())
-
-			// //update spec
-			// // Update
-			// updated := &ConfigOp{}
-			// Expect(k8sClient.Get(context.Background(), configOpLookupKey, updated)).Should(Succeed())
-
-			// updated.Spec.Namespaces = append(updated.Spec.Namespaces, "config-ns")
-			// Expect(k8sClient.Update(context.Background(), updated)).Should(Succeed())
-
-			// // ensure new namespace has been created
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, types.NamespacedName{Name: "config-ns"}, ns)
-			// 	return err == nil
-			// })
-			// // ensure that the config map has been created
-			// configmapKey = types.NamespacedName{Name: "test-configmap", Namespace: "config-ns"}
-
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, configmapKey, createdConfigMap)
-			// 	return err == nil
-			// }, timeout, interval).Should(BeTrue())
-
+			Expect(data).To(Equal(configOp.Labels))
 		})
 	})
 })
